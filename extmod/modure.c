@@ -1,5 +1,5 @@
 /*
- * This file is part of the Micro Python project, http://micropython.org/
+ * This file is part of the MicroPython project, http://micropython.org/
  *
  * The MIT License (MIT)
  *
@@ -28,11 +28,14 @@
 #include <assert.h>
 #include <string.h>
 
-#include "py/nlr.h"
 #include "py/runtime.h"
 #include "py/binary.h"
+#include "py/objstr.h"
+#include "py/stackctrl.h"
 
 #if MICROPY_PY_URE
+
+#define re1_5_stack_chk() MP_STACK_CHECK()
 
 #include "re1.5/re1.5.h"
 
@@ -69,7 +72,8 @@ STATIC mp_obj_t match_group(mp_obj_t self_in, mp_obj_t no_in) {
         // no match for this group
         return mp_const_none;
     }
-    return mp_obj_new_str(start, self->caps[no * 2 + 1] - start, false);
+    return mp_obj_new_str_of_type(mp_obj_get_type(self->str),
+        (const byte*)start, self->caps[no * 2 + 1] - start);
 }
 MP_DEFINE_CONST_FUN_OBJ_2(match_group_obj, match_group);
 
@@ -92,11 +96,11 @@ STATIC void re_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t 
     mp_printf(print, "<re %p>", self);
 }
 
-STATIC mp_obj_t re_exec(bool is_anchored, uint n_args, const mp_obj_t *args) {
+STATIC mp_obj_t ure_exec(bool is_anchored, uint n_args, const mp_obj_t *args) {
     (void)n_args;
     mp_obj_re_t *self = MP_OBJ_TO_PTR(args[0]);
     Subject subj;
-    mp_uint_t len;
+    size_t len;
     subj.begin = mp_obj_str_get_data(args[1], &len);
     subj.end = subj.begin + len;
     int caps_num = (self->re.sub + 1) * 2;
@@ -116,19 +120,20 @@ STATIC mp_obj_t re_exec(bool is_anchored, uint n_args, const mp_obj_t *args) {
 }
 
 STATIC mp_obj_t re_match(size_t n_args, const mp_obj_t *args) {
-    return re_exec(true, n_args, args);
+    return ure_exec(true, n_args, args);
 }
 MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(re_match_obj, 2, 4, re_match);
 
 STATIC mp_obj_t re_search(size_t n_args, const mp_obj_t *args) {
-    return re_exec(false, n_args, args);
+    return ure_exec(false, n_args, args);
 }
 MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(re_search_obj, 2, 4, re_search);
 
 STATIC mp_obj_t re_split(size_t n_args, const mp_obj_t *args) {
     mp_obj_re_t *self = MP_OBJ_TO_PTR(args[0]);
     Subject subj;
-    mp_uint_t len;
+    size_t len;
+    const mp_obj_type_t *str_type = mp_obj_get_type(args[1]);
     subj.begin = mp_obj_str_get_data(args[1], &len);
     subj.end = subj.begin + len;
     int caps_num = (self->re.sub + 1) * 2;
@@ -139,7 +144,7 @@ STATIC mp_obj_t re_split(size_t n_args, const mp_obj_t *args) {
     }
 
     mp_obj_t retval = mp_obj_new_list(0, NULL);
-    const char **caps = alloca(caps_num * sizeof(char*));
+    const char **caps = mp_local_alloc(caps_num * sizeof(char*));
     while (true) {
         // cast is a workaround for a bug in msvc: it treats const char** as a const pointer instead of a pointer to pointer to const char
         memset((char**)caps, 0, caps_num * sizeof(char*));
@@ -150,18 +155,20 @@ STATIC mp_obj_t re_split(size_t n_args, const mp_obj_t *args) {
             break;
         }
 
-        mp_obj_t s = mp_obj_new_str(subj.begin, caps[0] - subj.begin, false);
+        mp_obj_t s = mp_obj_new_str_of_type(str_type, (const byte*)subj.begin, caps[0] - subj.begin);
         mp_obj_list_append(retval, s);
         if (self->re.sub > 0) {
-            mp_not_implemented("Splitting with sub-captures");
+            mp_raise_NotImplementedError("Splitting with sub-captures");
         }
         subj.begin = caps[1];
         if (maxsplit > 0 && --maxsplit == 0) {
             break;
         }
     }
+    // cast is a workaround for a bug in msvc (see above)
+    mp_local_free((char**)caps);
 
-    mp_obj_t s = mp_obj_new_str(subj.begin, subj.end - subj.begin, false);
+    mp_obj_t s = mp_obj_new_str_of_type(str_type, (const byte*)subj.begin, subj.end - subj.begin);
     mp_obj_list_append(retval, s);
     return retval;
 }
@@ -197,7 +204,7 @@ STATIC mp_obj_t mod_re_compile(size_t n_args, const mp_obj_t *args) {
     int error = re1_5_compilecode(&o->re, re_str);
     if (error != 0) {
 error:
-        nlr_raise(mp_obj_new_exception_msg(&mp_type_ValueError, "Error in regex"));
+        mp_raise_ValueError("Error in regex");
     }
     if (flags & FLAG_DEBUG) {
         re1_5_dumpcode(&o->re);
@@ -211,7 +218,7 @@ STATIC mp_obj_t mod_re_exec(bool is_anchored, uint n_args, const mp_obj_t *args)
     mp_obj_t self = mod_re_compile(1, args);
 
     const mp_obj_t args2[] = {self, args[1]};
-    mp_obj_t match = re_exec(is_anchored, 2, args2);
+    mp_obj_t match = ure_exec(is_anchored, 2, args2);
     return match;
 }
 
@@ -237,7 +244,6 @@ STATIC MP_DEFINE_CONST_DICT(mp_module_re_globals, mp_module_re_globals_table);
 
 const mp_obj_module_t mp_module_ure = {
     .base = { &mp_type_module },
-    .name = MP_QSTR_ure,
     .globals = (mp_obj_dict_t*)&mp_module_re_globals,
 };
 

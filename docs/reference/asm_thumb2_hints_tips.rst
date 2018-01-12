@@ -78,11 +78,23 @@ three arguments, which must (if used) be named ``r0``, ``r1`` and ``r2``. When
 the code executes the registers will be initialised to those values.
 
 The data types which can be passed in this way are integers and memory
-addresses. With current firmware all possible 32 bit values may be passed.
-Returned integers are restricted in that the top two bits must be identical,
-limiting the range to -2**30 to 2**30 -1. The limitations on number of arguments
-and return values can be overcome by means of the ``array`` module which enables
-any number of values of any type to be accessed.
+addresses. With current firmware all possible 32 bit values may be passed and
+returned. If the return value may have the most significant bit set a Python
+type hint should be employed to enable MicroPython to determine whether the
+value should be interpreted as a signed or unsigned integer: types are
+``int`` or ``uint``.
+
+::
+
+    @micropython.asm_thumb
+    def uadd(r0, r1) -> uint:
+        add(r0, r0, r1)
+
+``hex(uadd(0x40000000,0x40000000))`` will return 0x80000000, demonstrating the
+passing and return of integers where bits 30 and 31 differ.
+
+The limitations on the number of arguments and return values can be overcome by means
+of the ``array`` module which enables any number of values of any type to be accessed.
 
 Multiple arguments
 ~~~~~~~~~~~~~~~~~~
@@ -117,7 +129,7 @@ Non-integer data types
 ~~~~~~~~~~~~~~~~~~~~~~
 
 These may be handled by means of arrays of the appropriate data type. For
-example, single precison floating point data may be processed as follows.
+example, single precision floating point data may be processed as follows.
 This code example takes an array of floats and replaces its contents with
 their squares.
 
@@ -160,7 +172,7 @@ thus:
 
 The const() construct causes MicroPython to replace the variable name
 with its value at compile time. If constants are declared in an outer
-Python scope they can be shared between mutiple assembler functions and
+Python scope they can be shared between multiple assembler functions and
 with Python code.
 
 Assembler code as class methods

@@ -1,5 +1,13 @@
-import _io as io # uPy does not have io module builtin
 import sys
+try:
+    try:
+        import uio as io
+    except ImportError:
+        import io
+except ImportError:
+    print("SKIP")
+    raise SystemExit
+
 if hasattr(sys, 'print_exception'):
     print_exception = sys.print_exception
 else:
@@ -23,7 +31,7 @@ def print_exc(e):
 
 # basic exception message
 try:
-    XXX
+    1/0
 except Exception as e:
     print('caught')
     print_exc(e)
@@ -32,9 +40,19 @@ except Exception as e:
 def f():
     g()
 def g():
-    YYY
+    2/0
 try:
     f()
 except Exception as e:
     print('caught')
+    print_exc(e)
+
+# Here we have a function with lots of bytecode generated for a single source-line, and
+# there is an error right at the end of the bytecode.  It should report the correct line.
+def f():
+    f([1, 2], [1, 2], [1, 2], {1:1, 1:1, 1:1, 1:1, 1:1, 1:1, 1:X})
+    return 1
+try:
+    f()
+except Exception as e:
     print_exc(e)

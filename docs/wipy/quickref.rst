@@ -44,18 +44,18 @@ See :ref:`machine.Pin <machine.Pin>`. ::
 Timers
 ------
 
-See :ref:`machine.Timer <machine.Timer>` and :ref:`machine.Pin <machine.Pin>`. ::
+See :ref:`machine.Timer <machine.Timer>` and :ref:`machine.Pin <machine.Pin>`.
+Timer ``id``'s take values from 0 to 3.::
 
     from machine import Timer
     from machine import Pin
 
-    tim = Timer(1, mode=Timer.PERIODIC)
+    tim = Timer(0, mode=Timer.PERIODIC)
     tim_a = tim.channel(Timer.A, freq=1000)
-    tim_a.time() # get the value in microseconds
-    tim_a.freq(1) # 1 Hz
+    tim_a.freq(5) # 5 Hz
     
     p_out = Pin('GP2', mode=Pin.OUT)
-    tim_a.irq(handler=lambda t: p_out.toggle())
+    tim_a.irq(trigger=Timer.TIMEOUT, handler=lambda t: p_out.toggle())
 
 PWM (pulse width modulation)
 ----------------------------
@@ -63,16 +63,12 @@ PWM (pulse width modulation)
 See :ref:`machine.Pin <machine.Pin>` and :ref:`machine.Timer <machine.Timer>`. ::
 
     from machine import Timer
-    from machine import Pin
 
-    # assign GP25 to alternate function 9 (PWM)
-    p_out = Pin('GP25', mode=Pin.AF, alt=9)
-
-    # timer 2 in PWM mode and width must be 16 buts
-    tim = Timer(2, mode=Timer.PWM, width=16)
+    # timer 1 in PWM mode and width must be 16 buts
+    tim = Timer(1, mode=Timer.PWM, width=16)
     
-    # enable channel A @1KHz with a 50% duty cycle
-    tim_a = tim.channel(Timer.A, freq=1000, duty_cycle=50)
+    # enable channel A @1KHz with a 50.55% duty cycle
+    tim_a = tim.channel(Timer.A, freq=1000, duty_cycle=5055)
 
 ADC (analog to digital conversion)
 ----------------------------------
@@ -107,7 +103,7 @@ See :ref:`machine.SPI <machine.SPI>`. ::
     spi.write('hello')
     spi.read(5) # receive 5 bytes on the bus
     rbuf = bytearray(5)
-    spi.write_readinto('hello', rbuf) # send a receive 5 bytes
+    spi.write_readinto('hello', rbuf) # send and receive 5 bytes
 
 I2C bus
 -------
@@ -116,7 +112,7 @@ See :ref:`machine.I2C <machine.I2C>`. ::
 
     from machine import I2C
     # configure the I2C bus
-    i2c = I2C(0, I2C.MASTER, baudrate=100000)
+    i2c = I2C(baudrate=100000)
     i2c.scan() # returns list of slave addresses
     i2c.writeto(0x42, 'hello') # send 5 bytes to slave with address 0x42
     i2c.readfrom(0x42, 5) # receive 5 bytes from slave
@@ -139,10 +135,9 @@ Real time clock (RTC)
 
 See :ref:`machine.RTC <machine.RTC>` ::
 
-    import machine
     from machine import RTC
 
-    rtc = machine.RTC() # init with default time and date
+    rtc = RTC() # init with default time and date
     rtc = RTC(datetime=(2015, 8, 29, 9, 0, 0, 0, None)) # init with a specific time and date
     print(rtc.now())
 
@@ -201,15 +196,15 @@ See :ref:`network.WLAN <network.WLAN>` and :mod:`machine`. ::
 Telnet and FTP server
 ---------------------
 
-See :ref:`network.server <network.server>` ::
+See :ref:`network.Server <network.Server>` ::
 
-    from network import server
+    from network import Server
 
     # init with new user, password and seconds timeout
-    server = server.init(login=('user', 'password'), timeout=60)
+    server = Server(login=('user', 'password'), timeout=60)
     server.timeout(300) # change the timeout
     server.timeout() # get the timeout
-    server.isrunning() # check wether the server is running or not
+    server.isrunning() # check whether the server is running or not
 
 Heart beat LED
 --------------

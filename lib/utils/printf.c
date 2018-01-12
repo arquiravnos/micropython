@@ -1,5 +1,5 @@
 /*
- * This file is part of the Micro Python project, http://micropython.org/
+ * This file is part of the MicroPython project, http://micropython.org/
  *
  * The MIT License (MIT)
  *
@@ -23,6 +23,10 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+
+#include "py/mpconfig.h"
+
+#if MICROPY_USE_INTERNAL_PRINTF
 
 #include <stdint.h>
 #include <string.h>
@@ -59,14 +63,11 @@ int vprintf(const char *fmt, va_list ap) {
 int DEBUG_printf(const char *fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
-    #if defined(MICROPY_DEBUG_STDERR) && MICROPY_DEBUG_STDERR
-    // Printing debug to stderr may give a chance tests which
-    // check stdout to pass, etc.
-    extern const mp_print_t mp_stderr_print;
-    int ret = mp_vprintf(&mp_stderr_print, fmt, ap);
-    #else
-    int ret = mp_vprintf(&mp_plat_print, fmt, ap);
+    #ifndef MICROPY_DEBUG_PRINTER_DEST
+    #define MICROPY_DEBUG_PRINTER_DEST mp_plat_print
     #endif
+    extern const mp_print_t MICROPY_DEBUG_PRINTER_DEST;
+    int ret = mp_vprintf(&MICROPY_DEBUG_PRINTER_DEST, fmt, ap);
     va_end(ap);
     return ret;
 }
@@ -130,3 +131,5 @@ int snprintf(char *str, size_t size, const char *fmt, ...) {
     va_end(ap);
     return ret;
 }
+
+#endif //MICROPY_USE_INTERNAL_PRINTF
